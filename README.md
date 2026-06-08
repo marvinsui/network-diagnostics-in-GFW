@@ -1,53 +1,81 @@
-# Network Diagnostics in GFW — 网络连通性诊断与修复
+<div align="center">
+
+# Network Diagnostics in GFW
+
+<p align="center">
+  <em>网络连通性诊断与修复</em>
+</p>
+
+> *「代理一死，全员瘫痪。你得让每个工具自己学会走路，别把命拴在一根绳上。」*
 
 [![Version](https://img.shields.io/badge/version-2.1.0-blue)](SKILL.md)
 [![Hermes](https://img.shields.io/badge/Hermes-skill-6C2BD9)](https://hermes-agent.nousresearch.com)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Multi-Runtime](https://img.shields.io/badge/Runtime-Hermes%20Agent-blueviolet)](https://hermes-agent.nousresearch.com)
 
-> A Hermes Agent skill for diagnosing and fixing developer toolchain connectivity behind the Great Firewall.
-> 一个用于在 GFW 网络环境下诊断并修复开发工具链连通性的 Hermes Agent 技能。
+<br>
+
+**Don't set global proxy env vars. Diagnose each tool. Fix individually. Remember your preferences.**
+
+<br>
+
+9-channel connectivity detection · Intent-aware diagnosis · Step-by-step repair · Persistent auto-fix memory · Full mirror knowledge base
 
 [中文详细文档 →](README_CN.md)
 
+</div>
+
 ---
 
-## What It Does
+## What It Solves
 
-In mainland China, developer tools (git, pip, npm, curl, Python, cargo, go...) often lose connectivity to foreign servers. Some channels work, some don't. This skill:
+In mainland China, developer tools face a fragmented network: some channels work, some don't. The traditional fix — `export HTTPS_PROXY=http://127.0.0.1:7890` — creates a fatal side effect:
 
-1. **Intent-aware diagnosis** — detects which tools you need, tests only those channels
-2. **Step-by-step repair** — explains the problem, offers a fix, asks for confirmation
-3. **Remembers your preferences** — "auto-fix from now on" via persistent memory
+> **When the proxy goes down, everything dies — including the AI agent itself. No network = no self-rescue. Death loop.**
 
-## Design Principle
+This skill takes the opposite approach: **each tool manages its own connectivity**, so one failure can't cascade.
 
-**No global proxy environment variables.** Setting `HTTPS_PROXY` globally means every tool (including the agent's own API calls) routes through the proxy. When the proxy goes down, everything dies — including the agent itself. Instead, each tool configures its own proxy or mirror independently.
+---
 
-## Quick Example
+## Quick Demo
 
 ```
 User: npm install keeps timing out!
 
 Agent: [loads network-diagnostics skill]
        Phase 0: Intent → npm → lock proxy/curl/npm channels
-       Phase 1: Diagnostics
        
        ═══ Network Diagnostics ═══
        ① Proxy   127.0.0.1:7890   ✅ OK
        ② curl    GitHub HTTPS      ✅ OK
        ⑦ npm     registry          ⚠️ ENOTFOUND
        
-       Phase 2:
-       ⑦ npm DNS blocked → auto-fix → npm config set registry npmmirror.com
+       Result: 2/3 OK, 1 fixable
+
+       ⑦ npm can't reach npmjs.org (DNS blocked).
        
-       Phase 3: Re-verify ✓
+       Fix: npm config set registry https://registry.npmmirror.com
+       
+       [Y]es / [N]o / [A]ll / [F]orever auto?
+       
+       → User chose F (remember forever)
+       → memory: network-diagnostics.auto_fix = true
+       
+       ═══ Re-verify ═══
+       ⑦ npm     registry          ✅ OK
+       
+       All fixed ✓
 ```
+
+> Each step annotated with the underlying mechanism: Phase 0 intent-lock, Phase 1 targeted diagnosis, Phase 2 interactive repair, Phase 3 re-verification.
+
+---
 
 ## Detection Matrix
 
-| # | Channel | Test | Fix |
-|---|---------|------|-----|
-| ① | Proxy alive | `curl --proxy` to GitHub | ⛔ Blocker — open proxy first |
+| # | Channel | Test | Failure Fix |
+|---|---------|------|-------------|
+| ① | Proxy alive | `curl --proxy` to GitHub | ⛔ Blocker — start proxy first |
 | ② | curl → GitHub | `curl -sI` GitHub HTTPS | Check proxy config |
 | ③ | git → GitHub | `git ls-remote` | `git config http.proxy` |
 | ④ | Python → GitHub | `urllib` to codeload | Check hermes `.env` |
@@ -57,49 +85,80 @@ Agent: [loads network-diagnostics skill]
 | ⑧ | cargo → crates.io | `cargo search` | USTC mirror |
 | ⑨ | go → proxy | `go env GOPROXY` | goproxy.cn |
 
-## Repair Flow
+---
 
-```
-Phase 1: Diagnose → report (✅/⚠️/❌ per channel)
-Phase 2: For each broken channel:
-  → Explain the problem
-  → Show the fix command
-  → Ask: [Y]es / [A]ll / [F]orever auto
-    Y = this one only
-    A = this + all remaining
-    F = save "auto_fix: true" to memory
-Phase 3: Re-verify fixed channels
-```
+## Design Principles
+
+### 1. No Global Proxy Env Vars
+
+Never `export HTTPS_PROXY`. Each tool independently:
+
+| Tool | Config Method | Blast Radius |
+|------|--------------|-------------|
+| git | `git config --global http.proxy` | git only |
+| npm | `npm config set registry` | npm only |
+| pip | `pip config set global.index-url` | pip only |
+| cargo | `~/.cargo/config.toml` | cargo only |
+| go | `go env -w GOPROXY` | go only |
+
+Proxy down? Only git breaks. Everything else still works.
+
+### 2. Intent-Aware Diagnosis
+
+Activate → ask "what do you need?" → lock only relevant channels. Never run the full matrix unless asked.
+
+### 3. Ask Before Fix
+
+Every fix: explain the problem → show the command → wait for confirmation. User can choose "remember forever" to persist via Hermes memory.
+
+---
 
 ## Installation
 
-### Via Hermes Skills Hub (coming soon)
+### Option 1: One-liner (recommended, cross-runtime)
 
 ```bash
-hermes skills install network-diagnostics
+npx skills add marvinsui/network-diagnostics-in-GFW
 ```
 
-### Manual
+Works with [vercel-labs/skills](https://github.com/vercel-labs/skills) (55+ runtime support). Auto-detects your runtime.
+
+### Option 2: Manual (Hermes Agent)
 
 ```bash
+git clone https://github.com/marvinsui/network-diagnostics-in-GFW.git
 mkdir -p ~/AppData/Local/hermes/skills/devops/network-diagnostics
-cp SKILL.md ~/AppData/Local/hermes/skills/devops/network-diagnostics/
-cp -r references/ ~/AppData/Local/hermes/skills/devops/network-diagnostics/
+cp network-diagnostics-in-GFW/SKILL.md ~/AppData/Local/hermes/skills/devops/network-diagnostics/
+cp -r network-diagnostics-in-GFW/references/ ~/AppData/Local/hermes/skills/devops/network-diagnostics/
 ```
 
-## Files
+### Verify
 
-```
-network-diagnostics-in-GFW/
-├── SKILL.md              # Skill definition (loaded by Hermes)
-├── README.md             # This file (English)
-├── README_CN.md          # Detailed Chinese documentation
-├── LICENSE               # MIT
-└── references/
-    └── error-signatures.md   # GFW error pattern cheat sheet
+```bash
+hermes skills list | grep network-diagnostics
 ```
 
-## Verified Mirrors
+### Usage
+
+```
+> 帮我测一下网络，npm 一直超时
+> 全面诊断一下开发环境的外网连通性
+> 代理关了，帮我看看哪些工具还能用
+```
+
+---
+
+## Repair Knowledge Base
+
+### GitHub Channels
+
+| Method | Command | Scope |
+|--------|---------|-------|
+| git proxy | `git config --global http.proxy http://127.0.0.1:7890` | git only |
+| Python urllib | `urllib.request.urlopen(codeload_url)` | Python scripts |
+| jsDelivr CDN | `curl -sL "https://cdn.jsdelivr.net/gh/..."` | single files |
+
+### Verified Mirrors
 
 | Service | Mirror URL | Status |
 |---------|-----------|--------|
@@ -109,7 +168,22 @@ network-diagnostics-in-GFW/
 | Playwright browsers | `https://npmmirror.com/mirrors/playwright/` | ✅ |
 | Cargo (Rust) | `https://mirrors.ustc.edu.cn/crates.io-index` | ✅ |
 | Go modules | `https://goproxy.cn` | ✅ |
-| jsDelivr CDN | `https://cdn.jsdelivr.net/gh/` | ✅ (single files only) |
+
+---
+
+## Repository Structure
+
+```
+network-diagnostics-in-GFW/
+├── SKILL.md                       # Skill definition (loaded by Hermes)
+├── README.md                      # This file (English)
+├── README_CN.md                   # Detailed Chinese documentation
+├── LICENSE                        # MIT
+└── references/
+    └── error-signatures.md        # GFW error pattern cheat sheet
+```
+
+---
 
 ## License
 
